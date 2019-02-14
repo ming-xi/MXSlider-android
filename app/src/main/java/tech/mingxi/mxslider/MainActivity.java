@@ -19,8 +19,8 @@ public class MainActivity extends AppCompatActivity {
 		setContentView(R.layout.activity_main);
 		slider = findViewById(R.id.activity_main_slider);
 		ImageManager imageManager = slider.getImageManager();
-		imageManager.addBitmap(Bitmap.createBitmap(new int[]{Color.RED}, 1, 1, Bitmap.Config.ARGB_8888));
-		imageManager.addBitmap(Bitmap.createBitmap(new int[]{Color.GREEN}, 1, 1, Bitmap.Config.ARGB_8888));
-		imageManager.addBitmap(Bitmap.createBitmap(new int[]{Color.BLUE}, 1, 1, Bitmap.Config.ARGB_8888));
+		imageManager.addBitmap(Bitmap.createBitmap(new int[]{Color.parseColor("#ffffff")}, 1, 1, Bitmap.Config.ARGB_8888));
+		imageManager.addBitmap(Bitmap.createBitmap(new int[]{Color.parseColor("#eeeeee")}, 1, 1, Bitmap.Config.ARGB_8888));
+		imageManager.addBitmap(Bitmap.createBitmap(new int[]{Color.parseColor("#dddddd")}, 1, 1, Bitmap.Config.ARGB_8888));
 	}
 }

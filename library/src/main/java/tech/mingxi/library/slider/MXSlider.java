@@ -6,14 +6,24 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.os.SystemClock;
+import android.support.v4.view.ViewPager;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
+import android.view.VelocityTracker;
 import android.view.View;
 
 import tech.mingxi.library.Util;
 
 public class MXSlider extends View implements ImageManager.OnStateChangeListener {
+	/**
+	 * duration to settling/flinging to target page
+	 */
+	private static final long SETTLING_DURATION = 250;
+	/**
+	 * absolute velocity threshold of fling in 1 second
+	 */
+	private static final int FLING_THRESHOLD = 3000;
 	/**
 	 * prev image's top margin
 	 */
@@ -49,6 +59,8 @@ public class MXSlider extends View implements ImageManager.OnStateChangeListener
 	private boolean loop = true;
 	private Paint paint;
 	private ImageManager imageManager;
+
+	private int scrollState = ViewPager.SCROLL_STATE_IDLE;
 
 	public MXSlider(Context context) {
 		super(context);
@@ -93,7 +105,7 @@ public class MXSlider extends View implements ImageManager.OnStateChangeListener
 		return super.performClick();
 	}
 
-
+	VelocityTracker velocityTracker;
 	private float start_x;
 	private float start_y;
 	private float lastSwipePosition = 0;
@@ -104,13 +116,22 @@ public class MXSlider extends View implements ImageManager.OnStateChangeListener
 
 	@Override
 	public boolean onTouchEvent(MotionEvent event) {
+		if (velocityTracker == null) {
+			velocityTracker = VelocityTracker.obtain();
+		}
+		velocityTracker.addMovement(event);
 		if (event.getAction() == MotionEvent.ACTION_DOWN) {
+			if (scrollState == ViewPager.SCROLL_STATE_SETTLING) {
+				settlingStarted = false;
+			}
+			scrollState = ViewPager.SCROLL_STATE_DRAGGING;
 			start_x = event.getX();
 			start_y = event.getY();
 			lastSwipePosition = swipePosition * getWidth();
 			touchStartTimestamp = SystemClock.uptimeMillis();
 			possibleClickFlag = true;
 		} else if (event.getAction() == MotionEvent.ACTION_MOVE) {
+			scrollState = ViewPager.SCROLL_STATE_DRAGGING;
 			float x = event.getX();
 			float y = event.getY();
 			if (possibleClickFlag && Util.getDistanceBetween(start_x, start_y, x, y) > Util.getPxFromDp(getContext(), CLICK_DISTANCE_DP_THRESHOLD)) {
@@ -124,10 +145,28 @@ public class MXSlider extends View implements ImageManager.OnStateChangeListener
 				swipePosition = imageManager.getImageCount() - 1;
 			}
 			invalidate();
-			Log.d("MXSlider", String.format("x=%.1f,y=%.1f,pos=%.1f", x, y, swipePosition));
 		} else if (event.getAction() == MotionEvent.ACTION_UP) {
 			float x = event.getX();
 			float y = event.getY();
+			velocityTracker.computeCurrentVelocity(1000);
+			float velocity = velocityTracker.getXVelocity();
+			scrollState = ViewPager.SCROLL_STATE_SETTLING;
+			isFling = Math.abs(velocity) >= FLING_THRESHOLD;
+			settlingStartSwipePosition = swipePosition;
+			if (isFling) {
+				settlingStartVelocity = velocity / 1000;
+				int index1 = (int) swipePosition;
+				if (velocity > 0) {//swipe to previous image
+					settlingDisplacement = getWidth() * (swipePosition - index1);//>0
+				} else {
+					settlingDisplacement = getWidth() * ((swipePosition - index1) - 1);//<0
+				}
+				settlingAcceleration = -settlingStartVelocity * settlingStartVelocity / (2 * settlingDisplacement);
+			} else {
+				int index1 = (int) (swipePosition + 0.5);//slide to nearest position
+				settlingDisplacement = getWidth() * (swipePosition - index1);
+			}
+			invalidate();
 			lastSwipePosition = swipePosition * getWidth();
 			if (possibleClickFlag && SystemClock.uptimeMillis() - touchStartTimestamp < CLICK_DURATION_THRESHOLD) {
 				performClick();
@@ -136,22 +175,44 @@ public class MXSlider extends View implements ImageManager.OnStateChangeListener
 		return true;
 	}
 
+	/**
+	 * whether settling is triggered by user's fling
+	 */
+	private boolean isFling = false;
+	/**
+	 * whether settling parameters are initiated
+	 */
+	private boolean settlingStarted = false;
+	/**
+	 * settling acceleration
+	 */
+	private float settlingAcceleration = 0;
+	/**
+	 * settling starting velocity
+	 */
+	private float settlingStartVelocity = 0;
+	/**
+	 * settling distance to go
+	 */
+	private float settlingDisplacement = 0;
+	/**
+	 * when settling started
+	 */
+	private long settlingStartTimestamp = 0;
+	/**
+	 * when settling should end
+	 */
+	private long settlingEndTimestamp = 0;
+	/**
+	 * swipe position when settling begins
+	 */
+	private float settlingStartSwipePosition = 0;
+
 	@Override
 	protected void onDraw(Canvas canvas) {
 		super.onDraw(canvas);
 		int width = getWidth();
 		int height = getHeight();
-		double ratio = width * 1.0 / height;
-//		int index = (int) Math.floor(swipePosition + 0.5f);
-//
-//		Bitmap current = imageManager.getImage(index);
-//		Bitmap prev = imageManager.getImage(index - 1);
-//		Bitmap next = imageManager.getImage(index + 1);
-//		if (current != null) {
-//			rectSrc.set(0, 0, );
-//			canvas.drawBitmap(current, );
-//		}
-
 		//draw background left image
 		int index1 = (int) swipePosition;
 		Bitmap bitmap1 = imageManager.getImage(index1);
@@ -185,6 +246,59 @@ public class MXSlider extends View implements ImageManager.OnStateChangeListener
 					height
 			);
 			canvas.drawBitmap(bitmap2, rectSrc, rectDst, paint);
+		}
+		if (scrollState == ViewPager.SCROLL_STATE_SETTLING) {
+			if (settlingDisplacement == 0) {
+				scrollState = ViewPager.SCROLL_STATE_IDLE;
+				settlingStarted = false;
+				return;
+			}
+			if (isFling) {
+				//triggered by user's fling
+				if (!settlingStarted) {
+					settlingStarted = true;
+					settlingStartTimestamp = SystemClock.uptimeMillis();
+					settlingEndTimestamp = (long) (settlingStartTimestamp - settlingStartVelocity / settlingAcceleration);
+				} else {
+					float timeOffset = SystemClock.uptimeMillis() - settlingStartTimestamp;
+					float displacementOffset = settlingStartVelocity * timeOffset + 0.5f * settlingAcceleration * timeOffset * timeOffset;
+					if (settlingStartTimestamp + timeOffset >= settlingEndTimestamp) {
+						displacementOffset = settlingDisplacement;
+						scrollState = ViewPager.SCROLL_STATE_IDLE;
+						settlingStarted = false;
+					}
+					swipePosition = settlingStartSwipePosition - displacementOffset / getWidth();
+					if (swipePosition < 0) {
+						swipePosition = 0;
+					} else if (swipePosition > imageManager.getImageCount() - 1) {
+						swipePosition = imageManager.getImageCount() - 1;
+					}
+				}
+			} else {
+				//triggered by touch-up event
+				if (!settlingStarted) {
+					settlingStarted = true;
+					settlingStartTimestamp = SystemClock.uptimeMillis();
+					settlingEndTimestamp = settlingStartTimestamp + SETTLING_DURATION;
+					settlingAcceleration = -2 * settlingDisplacement / (SETTLING_DURATION * SETTLING_DURATION);
+					settlingStartVelocity = -settlingAcceleration * SETTLING_DURATION;
+				} else {
+					float timeOffset = SystemClock.uptimeMillis() - settlingStartTimestamp;
+					float displacementOffset = settlingStartVelocity * timeOffset + 0.5f * settlingAcceleration * timeOffset * timeOffset;
+					if (settlingStartTimestamp + timeOffset >= settlingEndTimestamp) {
+						displacementOffset = settlingDisplacement;
+						scrollState = ViewPager.SCROLL_STATE_IDLE;
+						settlingStarted = false;
+					}
+					swipePosition = settlingStartSwipePosition - displacementOffset / getWidth();
+					if (swipePosition < 0) {
+						swipePosition = 0;
+					} else if (swipePosition > imageManager.getImageCount() - 1) {
+						swipePosition = imageManager.getImageCount() - 1;
+					}
+				}
+			}
+			invalidate();
 		}
 	}
 
