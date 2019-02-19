@@ -3,19 +3,23 @@ package tech.mingxi.library.slider;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.net.Uri;
 import android.os.SystemClock;
 import android.support.v4.view.ViewPager;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
 
-import tech.mingxi.library.Util;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MXSlider extends View implements ImageManager.OnStateChangeListener {
+	private static boolean DEBUG = false;
+	private List<Rect> debugRects;
 	/**
 	 * duration to settling/flinging to target page
 	 */
@@ -25,29 +29,22 @@ public class MXSlider extends View implements ImageManager.OnStateChangeListener
 	 */
 	private static final int FLING_THRESHOLD = 3000;
 	/**
-	 * prev image's top margin
+	 * scheme for resources in assets folder
 	 */
-	private float prevTopMargin = 0;
+	static final String SCHEME_ASSETS = "assets";
 	/**
-	 * prev image's bottom margin
+	 * side-image's top margin
 	 */
-	private float prevBottomMargin = 0;
+	private int sideTopMargin = 0;
 	/**
-	 * prev image's width
+	 * side-image's bottom margin
 	 */
-	private float prevWidth = 0;
+	private int sideBottomMargin = 0;
 	/**
-	 * next image's top margin
+	 * side-image's width
 	 */
-	private float nextTopMargin = 0;
-	/**
-	 * next image's bottom margin
-	 */
-	private float nextBottomMargin = 0;
-	/**
-	 * next image's width
-	 */
-	private float nextWidth = 0;
+	private int sideWidth = 0;
+
 	/**
 	 * swipe position in [0,size-1]. e.g. 1.5f means user swiped to the position where second image
 	 * and third image are both displayed half of themselves.
@@ -82,11 +79,34 @@ public class MXSlider extends View implements ImageManager.OnStateChangeListener
 		init();
 	}
 
+	/**
+	 * convert a asset-path to uri
+	 *
+	 * @param path full path of file in assets folder
+	 * @return a uri for ImageManager
+	 */
+	public static Uri getUriForAsset(String path) {
+		if (path.startsWith("/")) {
+			path = path.replaceFirst("/+", "");
+		}
+		return Uri.parse(SCHEME_ASSETS + ":///" + path);
+	}
+
 	private void init() {
+		sideTopMargin = Util.getPxFromDp(getContext(), 96);
+		sideBottomMargin = Util.getPxFromDp(getContext(), 48);
+		sideWidth = Util.getPxFromDp(getContext(), 32);
 		setWillNotDraw(false);
 		paint = new Paint();
+		paint.setFilterBitmap(true);
+		paint.setDither(true);
 		paint.setAntiAlias(true);
-		setImageManager(new ImageManager(this));
+		if (DEBUG) {
+			debugRects = new ArrayList<>();
+			paint.setStyle(Paint.Style.STROKE);
+			paint.setColor(Color.GREEN);
+		}
+		setImageManager(new ImageManager(getContext(), this));
 	}
 
 	private void setImageManager(ImageManager imageManager) {
@@ -109,6 +129,7 @@ public class MXSlider extends View implements ImageManager.OnStateChangeListener
 	private float start_x;
 	private float start_y;
 	private float lastSwipePosition = 0;
+	private float lastFrameSwipePosition = 0;
 	private long touchStartTimestamp = 0;
 	private boolean possibleClickFlag = true;
 	private static final int CLICK_DISTANCE_DP_THRESHOLD = 24;
@@ -128,6 +149,7 @@ public class MXSlider extends View implements ImageManager.OnStateChangeListener
 			start_x = event.getX();
 			start_y = event.getY();
 			lastSwipePosition = swipePosition * getWidth();
+			lastFrameSwipePosition = 0;
 			touchStartTimestamp = SystemClock.uptimeMillis();
 			possibleClickFlag = true;
 		} else if (event.getAction() == MotionEvent.ACTION_MOVE) {
@@ -144,7 +166,10 @@ public class MXSlider extends View implements ImageManager.OnStateChangeListener
 			} else if (swipePosition > imageManager.getImageCount() - 1) {
 				swipePosition = imageManager.getImageCount() - 1;
 			}
-			invalidate();
+			if (lastFrameSwipePosition != swipePosition) {
+				lastFrameSwipePosition = swipePosition;
+				invalidate();
+			}
 		} else if (event.getAction() == MotionEvent.ACTION_UP) {
 			float x = event.getX();
 			float y = event.getY();
@@ -208,98 +233,184 @@ public class MXSlider extends View implements ImageManager.OnStateChangeListener
 	 */
 	private float settlingStartSwipePosition = 0;
 
+//	@Override
+//	protected void onDraw(Canvas canvas) {
+//		super.onDraw(canvas);
+//		int width = getWidth();
+//		int height = getHeight();
+//		//draw background left image
+//		int indexCurrent = (int) swipePosition;
+//		Bitmap bitmapCurrent = imageManager.getImage(indexCurrent);
+//		if (bitmapCurrent != null) {
+//			rectSrc.set(
+//					(int) ((swipePosition - indexCurrent) * bitmapCurrent.getWidth()),
+//					0,
+//					bitmapCurrent.getWidth(),
+//					bitmapCurrent.getHeight()
+//			);
+//			rectDst.set(
+//					0,
+//					0,
+//					(int) ((1 - (swipePosition - indexCurrent)) * width),
+//					height
+//			);
+//			canvas.drawBitmap(bitmapCurrent, rectSrc, rectDst, paint);
+//			Log.w("MXSlider", "draw bitmap 1 pos=" + swipePosition);
+//		}
+//		if (indexCurrent * 1f != swipePosition) {
+//			//draw background right image if visible
+//			int indexNext = indexCurrent + 1;
+//			Bitmap bitmapNext = imageManager.getImage(indexNext);
+//			if (bitmapNext != null) {
+//				rectSrc.set(
+//						0,
+//						0,
+//						(int) ((1 - (indexNext - swipePosition)) * bitmapNext.getWidth()),
+//						bitmapNext.getHeight()
+//				);
+//				rectDst.set(
+//						(int) ((indexNext - swipePosition) * width),
+//						0,
+//						width,
+//						height
+//				);
+//				canvas.drawBitmap(bitmapNext, rectSrc, rectDst, paint);
+//				Log.w("MXSlider", "draw bitmap 2 pos=" + swipePosition);
+//			}
+//		}
+//		if (scrollState == ViewPager.SCROLL_STATE_SETTLING) {
+//			handleSettlingState();
+//		}
+//	}
+
 	@Override
 	protected void onDraw(Canvas canvas) {
 		super.onDraw(canvas);
 		int width = getWidth();
+		int centerWidth = width - 2 * sideWidth;
 		int height = getHeight();
-		//draw background left image
-		int index1 = (int) swipePosition;
-		Bitmap bitmap1 = imageManager.getImage(index1);
-		rectSrc.set(
-				(int) ((swipePosition - index1) * bitmap1.getWidth()),
-				0,
-				bitmap1.getWidth(),
-				bitmap1.getHeight()
-		);
-		rectDst.set(
-				0,
-				0,
-				(int) ((1 - (swipePosition - index1)) * width),
-				height
-		);
-		canvas.drawBitmap(bitmap1, rectSrc, rectDst, paint);
-		if (index1 * 1f != swipePosition) {
-			//draw background right image if visible
-			int index2 = index1 + 1;
-			Bitmap bitmap2 = imageManager.getImage(index2);
+		int imageCount = imageManager.getImageCount();
+		for (int index = 0; index < imageCount; index++) {
+			//visible in view as background
+			Bitmap bitmap = imageManager.getImage(index);
 			rectSrc.set(
 					0,
 					0,
-					(int) ((1 - (index2 - swipePosition)) * bitmap2.getWidth()),
-					bitmap2.getHeight()
+					bitmap.getWidth(),
+					bitmap.getHeight()
 			);
 			rectDst.set(
-					(int) ((index2 - swipePosition) * width),
+					(int) ((index - swipePosition) * width),
 					0,
-					width,
+					(int) ((1 + index - swipePosition) * width),
 					height
 			);
-			canvas.drawBitmap(bitmap2, rectSrc, rectDst, paint);
+			if (DEBUG) {
+				debugRects.add(new Rect(rectSrc));
+				debugRects.add(new Rect(rectDst));
+			}
+			canvas.drawBitmap(bitmap, rectSrc, rectDst, paint);
+
 		}
+		for (int index = 0; index < imageCount; index++) {
+			Bitmap bitmap = imageManager.getImage(index);
+			rectSrc.set(
+					0,
+					0,
+					bitmap.getWidth(),
+					bitmap.getHeight()
+			);
+			rectDst.set(
+					(int) (sideWidth + (index - swipePosition) * centerWidth),
+					sideTopMargin,
+					(int) (sideWidth + (index - swipePosition) * centerWidth + centerWidth),
+					height - sideBottomMargin
+			);
+			if (DEBUG) {
+				debugRects.add(new Rect(rectSrc));
+				debugRects.add(new Rect(rectDst));
+			}
+			canvas.drawBitmap(bitmap, rectSrc, rectDst, paint);
+		}
+		drawDebugFrame(canvas);
 		if (scrollState == ViewPager.SCROLL_STATE_SETTLING) {
-			if (settlingDisplacement == 0) {
-				scrollState = ViewPager.SCROLL_STATE_IDLE;
-				settlingStarted = false;
-				return;
-			}
-			if (isFling) {
-				//triggered by user's fling
-				if (!settlingStarted) {
-					settlingStarted = true;
-					settlingStartTimestamp = SystemClock.uptimeMillis();
-					settlingEndTimestamp = (long) (settlingStartTimestamp - settlingStartVelocity / settlingAcceleration);
-				} else {
-					float timeOffset = SystemClock.uptimeMillis() - settlingStartTimestamp;
-					float displacementOffset = settlingStartVelocity * timeOffset + 0.5f * settlingAcceleration * timeOffset * timeOffset;
-					if (settlingStartTimestamp + timeOffset >= settlingEndTimestamp) {
-						displacementOffset = settlingDisplacement;
-						scrollState = ViewPager.SCROLL_STATE_IDLE;
-						settlingStarted = false;
-					}
-					swipePosition = settlingStartSwipePosition - displacementOffset / getWidth();
-					if (swipePosition < 0) {
-						swipePosition = 0;
-					} else if (swipePosition > imageManager.getImageCount() - 1) {
-						swipePosition = imageManager.getImageCount() - 1;
-					}
-				}
-			} else {
-				//triggered by touch-up event
-				if (!settlingStarted) {
-					settlingStarted = true;
-					settlingStartTimestamp = SystemClock.uptimeMillis();
-					settlingEndTimestamp = settlingStartTimestamp + SETTLING_DURATION;
-					settlingAcceleration = -2 * settlingDisplacement / (SETTLING_DURATION * SETTLING_DURATION);
-					settlingStartVelocity = -settlingAcceleration * SETTLING_DURATION;
-				} else {
-					float timeOffset = SystemClock.uptimeMillis() - settlingStartTimestamp;
-					float displacementOffset = settlingStartVelocity * timeOffset + 0.5f * settlingAcceleration * timeOffset * timeOffset;
-					if (settlingStartTimestamp + timeOffset >= settlingEndTimestamp) {
-						displacementOffset = settlingDisplacement;
-						scrollState = ViewPager.SCROLL_STATE_IDLE;
-						settlingStarted = false;
-					}
-					swipePosition = settlingStartSwipePosition - displacementOffset / getWidth();
-					if (swipePosition < 0) {
-						swipePosition = 0;
-					} else if (swipePosition > imageManager.getImageCount() - 1) {
-						swipePosition = imageManager.getImageCount() - 1;
-					}
-				}
-			}
-			invalidate();
+			handleSettlingState();
 		}
+	}
+
+	@Override
+	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+		super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+	}
+
+	@Override
+	protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+		super.onLayout(changed, left, top, right, bottom);
+		imageManager.refreshBitmaps(getWidth(), getHeight());
+	}
+
+	private void handleSettlingState() {
+		if (settlingDisplacement == 0) {
+			scrollState = ViewPager.SCROLL_STATE_IDLE;
+			settlingStarted = false;
+			return;
+		}
+		if (isFling) {
+			//triggered by user's fling
+			if (!settlingStarted) {
+				settlingStarted = true;
+				settlingStartTimestamp = SystemClock.uptimeMillis();
+				settlingEndTimestamp = (long) (settlingStartTimestamp - settlingStartVelocity / settlingAcceleration);
+			} else {
+				float timeOffset = SystemClock.uptimeMillis() - settlingStartTimestamp;
+				float displacementOffset = settlingStartVelocity * timeOffset + 0.5f * settlingAcceleration * timeOffset * timeOffset;
+				if (settlingStartTimestamp + timeOffset >= settlingEndTimestamp) {
+					displacementOffset = settlingDisplacement;
+					scrollState = ViewPager.SCROLL_STATE_IDLE;
+					settlingStarted = false;
+				}
+				swipePosition = settlingStartSwipePosition - displacementOffset / getWidth();
+				if (swipePosition < 0) {
+					swipePosition = 0;
+				} else if (swipePosition > imageManager.getImageCount() - 1) {
+					swipePosition = imageManager.getImageCount() - 1;
+				}
+			}
+		} else {
+			//triggered by touch-up event
+			if (!settlingStarted) {
+				settlingStarted = true;
+				settlingStartTimestamp = SystemClock.uptimeMillis();
+				settlingEndTimestamp = settlingStartTimestamp + SETTLING_DURATION;
+				settlingAcceleration = -2 * settlingDisplacement / (SETTLING_DURATION * SETTLING_DURATION);
+				settlingStartVelocity = -settlingAcceleration * SETTLING_DURATION;
+			} else {
+				float timeOffset = SystemClock.uptimeMillis() - settlingStartTimestamp;
+				float displacementOffset = settlingStartVelocity * timeOffset + 0.5f * settlingAcceleration * timeOffset * timeOffset;
+				if (settlingStartTimestamp + timeOffset >= settlingEndTimestamp) {
+					displacementOffset = settlingDisplacement;
+					scrollState = ViewPager.SCROLL_STATE_IDLE;
+					settlingStarted = false;
+				}
+				swipePosition = settlingStartSwipePosition - displacementOffset / getWidth();
+				if (swipePosition < 0) {
+					swipePosition = 0;
+				} else if (swipePosition > imageManager.getImageCount() - 1) {
+					swipePosition = imageManager.getImageCount() - 1;
+				}
+			}
+		}
+		invalidate();
+	}
+
+	private void drawDebugFrame(Canvas canvas) {
+		if (!DEBUG) {
+			return;
+		}
+		for (Rect rect : debugRects) {
+			canvas.drawRect(rect, paint);
+		}
+		debugRects.clear();
 	}
 
 	@Override
