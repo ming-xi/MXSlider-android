@@ -10,6 +10,7 @@ import android.net.Uri;
 import android.os.SystemClock;
 import android.support.v4.view.ViewPager;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
@@ -119,6 +120,7 @@ public class MXSlider extends View implements ImageManager.OnStateChangeListener
 
 	private Rect rectSrc = new Rect();
 	private Rect rectDst = new Rect();
+	private Rect rectView = new Rect();
 
 	@Override
 	public boolean performClick() {
@@ -287,50 +289,60 @@ public class MXSlider extends View implements ImageManager.OnStateChangeListener
 	protected void onDraw(Canvas canvas) {
 		super.onDraw(canvas);
 		int width = getWidth();
-		int centerWidth = width - 2 * sideWidth;
 		int height = getHeight();
+		float offset;
+		int centerWidth = width - 2 * sideWidth;
+		int bitmapCenterWidth;
 		int imageCount = imageManager.getImageCount();
 		for (int index = 0; index < imageCount; index++) {
 			//visible in view as background
-			Bitmap bitmap = imageManager.getImage(index);
-			rectSrc.set(
-					0,
-					0,
-					bitmap.getWidth(),
-					bitmap.getHeight()
-			);
+			offset = index - swipePosition;
 			rectDst.set(
-					(int) ((index - swipePosition) * width),
+					(int) (offset * width),
 					0,
-					(int) ((1 + index - swipePosition) * width),
+					(int) ((1 + offset) * width),
 					height
 			);
-			if (DEBUG) {
-				debugRects.add(new Rect(rectSrc));
-				debugRects.add(new Rect(rectDst));
+			if (Rect.intersects(rectDst, rectView)) {
+				Bitmap bitmap = imageManager.getImage(index);
+				rectSrc.set(
+						0,
+						0,
+						bitmap.getWidth(),
+						bitmap.getHeight()
+				);
+				if (DEBUG) {
+					debugRects.add(new Rect(rectSrc));
+					debugRects.add(new Rect(rectDst));
+				}
+				canvas.drawBitmap(bitmap, rectSrc, rectDst, paint);
 			}
-			canvas.drawBitmap(bitmap, rectSrc, rectDst, paint);
-
 		}
+		Log.i("MXSlider", "draw center views");
 		for (int index = 0; index < imageCount; index++) {
-			Bitmap bitmap = imageManager.getImage(index);
-			rectSrc.set(
-					0,
-					0,
-					bitmap.getWidth(),
-					bitmap.getHeight()
-			);
+			offset = index - swipePosition;
 			rectDst.set(
-					(int) (sideWidth + (index - swipePosition) * centerWidth),
+					(int) (sideWidth + offset * centerWidth),
 					sideTopMargin,
-					(int) (sideWidth + (index - swipePosition) * centerWidth + centerWidth),
+					(int) (sideWidth + offset * centerWidth + centerWidth),
 					height - sideBottomMargin
 			);
-			if (DEBUG) {
-				debugRects.add(new Rect(rectSrc));
-				debugRects.add(new Rect(rectDst));
+			if (Rect.intersects(rectDst, rectView)) {
+				Log.i("MXSlider", String.format("dst=%s view=%s offset=%.2f", rectDst.toString(), rectView.toString(), offset));
+				Bitmap bitmap = imageManager.getImage(index);
+				bitmapCenterWidth = (int) (((double) bitmap.getWidth()) / width * centerWidth);
+				rectSrc.set(
+						(int) (bitmap.getWidth() * (-0.5 * offset + 0.5) + bitmapCenterWidth * (0.5 * offset - 0.5)),
+						(int) (bitmap.getHeight() * ((double) sideTopMargin) / height),
+						(int) (bitmap.getWidth() * (-0.5 * offset + 0.5) + bitmapCenterWidth * (0.5 * offset + 0.5)),
+						(int) (bitmap.getHeight() * (1 - ((double) sideBottomMargin) / height))
+				);
+				if (DEBUG) {
+					debugRects.add(new Rect(rectSrc));
+					debugRects.add(new Rect(rectDst));
+				}
+				canvas.drawBitmap(bitmap, rectSrc, rectDst, paint);
 			}
-			canvas.drawBitmap(bitmap, rectSrc, rectDst, paint);
 		}
 		drawDebugFrame(canvas);
 		if (scrollState == ViewPager.SCROLL_STATE_SETTLING) {
@@ -346,6 +358,8 @@ public class MXSlider extends View implements ImageManager.OnStateChangeListener
 	@Override
 	protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
 		super.onLayout(changed, left, top, right, bottom);
+//		rectView.set(left,top,right,bottom);
+		getGlobalVisibleRect(rectView);
 		imageManager.refreshBitmaps(getWidth(), getHeight());
 	}
 
