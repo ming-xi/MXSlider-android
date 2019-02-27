@@ -1,4 +1,4 @@
-package tech.mingxi.mxslider;
+package tech.mingxi.musicplayerdemo;
 
 import org.junit.Test;
 

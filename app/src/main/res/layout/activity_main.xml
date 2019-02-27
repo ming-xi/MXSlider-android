@@ -15,4 +15,86 @@
 		app:layout_constraintEnd_toEndOf = "parent"
 		app:layout_constraintStart_toStartOf = "parent"
 		app:layout_constraintTop_toTopOf = "parent"/>
+	<!--<ImageView-->
+	<!--android:layout_width = "0dp"-->
+	<!--android:layout_height = "0dp"-->
+	<!--android:src = "@drawable/gradient_shadow"-->
+	<!--app:layout_constraintBottom_toBottomOf = "parent"-->
+	<!--app:layout_constraintEnd_toEndOf = "parent"-->
+	<!--app:layout_constraintStart_toStartOf = "parent"-->
+	<!--app:layout_constraintTop_toTopOf = "parent"/>-->
+	<ProgressBar
+		android:id = "@+id/activity_main_progress"
+		style = "@style/Widget.AppCompat.ProgressBar.Horizontal"
+		android:layout_width = "0dp"
+		android:layout_height = "2dp"
+		android:layout_marginBottom = "48dp"
+		android:layout_marginEnd = "48dp"
+		android:layout_marginStart = "48dp"
+		android:max = "@integer/progress_max"
+		android:progress = "3000"
+		android:progressDrawable = "@drawable/shape_progress_bar"
+		app:layout_constraintBottom_toTopOf = "@id/activity_main_play"
+		app:layout_constraintEnd_toEndOf = "parent"
+		app:layout_constraintStart_toStartOf = "parent"/>
+
+	<ImageButton
+		android:id = "@+id/activity_main_play"
+		android:layout_width = "80dp"
+		android:layout_height = "80dp"
+		android:layout_marginBottom = "64dp"
+		android:background = "@drawable/oval_play_button"
+		android:foreground = "?attr/selectableItemBackground"
+		android:padding = "28dp"
+		android:src = "@drawable/ic_play_arrow_white_24dp"
+		app:layout_constraintBottom_toBottomOf = "parent"
+		app:layout_constraintEnd_toEndOf = "parent"
+		app:layout_constraintStart_toStartOf = "parent"/>
+
+	<ImageButton
+		android:id = "@+id/activity_main_prev"
+		android:layout_width = "48dp"
+		android:layout_height = "48dp"
+		android:layout_marginEnd = "32dp"
+		android:background = "@drawable/oval_button"
+		android:foreground = "?attr/selectableItemBackground"
+		android:src = "@drawable/ic_skip_previous_white_16dp"
+		app:layout_constraintBottom_toBottomOf = "@id/activity_main_play"
+		app:layout_constraintEnd_toStartOf = "@id/activity_main_play"
+		app:layout_constraintTop_toTopOf = "@id/activity_main_play"/>
+
+	<ImageButton
+		android:id = "@+id/activity_main_next"
+		android:layout_width = "48dp"
+		android:layout_height = "48dp"
+		android:layout_marginStart = "32dp"
+		android:background = "@drawable/oval_button"
+		android:foreground = "?attr/selectableItemBackground"
+		android:src = "@drawable/ic_skip_next_white_16dp"
+		app:layout_constraintBottom_toBottomOf = "@id/activity_main_play"
+		app:layout_constraintStart_toEndOf = "@id/activity_main_play"
+		app:layout_constraintTop_toTopOf = "@id/activity_main_play"/>
+
+	<ImageButton
+		android:id = "@+id/activity_main_random"
+		android:layout_width = "36dp"
+		android:layout_height = "36dp"
+		android:layout_marginStart = "8dp"
+		android:layout_marginTop = "8dp"
+		android:background = "@drawable/oval_button"
+		android:foreground = "?attr/selectableItemBackground"
+		android:src = "@drawable/ic_shuffle_white_16dp"
+		app:layout_constraintStart_toStartOf = "parent"
+		app:layout_constraintTop_toBottomOf = "@id/activity_main_prev"/>
+
+	<ImageButton
+		android:id = "@+id/activity_main_loop"
+		android:layout_width = "36dp"
+		android:layout_height = "36dp"
+		android:layout_marginEnd = "8dp"
+		android:background = "@drawable/oval_button"
+		android:foreground = "?attr/selectableItemBackground"
+		android:src = "@drawable/ic_repeat_white_16dp"
+		app:layout_constraintEnd_toEndOf = "parent"
+		app:layout_constraintTop_toTopOf = "@id/activity_main_random"/>
 </android.support.constraint.ConstraintLayout>
