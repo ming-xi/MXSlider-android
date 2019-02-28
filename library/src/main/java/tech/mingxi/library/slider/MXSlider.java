@@ -1,6 +1,7 @@
 package tech.mingxi.library.slider;
 
 import android.content.Context;
+import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -8,7 +9,9 @@ import android.graphics.LinearGradient;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Region;
+import android.graphics.Typeface;
 import android.net.Uri;
+import android.os.Build;
 import android.os.SystemClock;
 import android.support.annotation.IntRange;
 import android.support.v4.view.ViewPager;
@@ -23,7 +26,33 @@ import android.view.View;
 import java.util.ArrayList;
 import java.util.List;
 
+import tech.mingxi.library.R;
+
 public class MXSlider extends View implements PageManager.OnStateChangeListener {
+	public enum TextPositionStyle {
+		CLASSICAL(0), PACKED(1);
+
+		private final int id;
+
+		static TextPositionStyle fromId(int id) {
+			switch (id) {
+				case 1:
+					return PACKED;
+				case 0:
+				default:
+					return CLASSICAL;
+			}
+		}
+
+		TextPositionStyle(int i) {
+			id = i;
+		}
+
+		public int getId() {
+			return id;
+		}
+	}
+
 	public static final String DEBUG_TAG = "MXSlider";
 	private static boolean DEBUG = false;
 	private List<Rect> debugRects;
@@ -39,6 +68,16 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 	 * scheme for resources in assets folder
 	 */
 	static final String SCHEME_ASSETS = "assets";
+
+	TextPositionStyle textPositionStyle = TextPositionStyle.CLASSICAL;
+	/**
+	 * vertical position of the anchor of text
+	 */
+	private float textVerticalPosition = 0.45f;
+	/**
+	 * space between title and subtitle
+	 */
+	private float textVerticalSpacing = 40f;
 	/**
 	 * side-image's top margin
 	 */
@@ -51,6 +90,10 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 	 * side-image's width
 	 */
 	private int sideWidth = 24;
+	/**
+	 * text's margin
+	 */
+	private float textMargin = 24;
 	/**
 	 * title's font-size
 	 */
@@ -69,7 +112,7 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 	 */
 	private boolean loop = true;
 	/**
-	 * when setIndex(index, true) is called, this flag will be set to true to prevent user's touch events
+	 * when setIndex(id, true) is called, this flag will be set to true to prevent user's touch events
 	 * and will be set to false when settling animation is done and user touches screen again.
 	 */
 	private boolean userTouchCanceled = false;
@@ -85,22 +128,22 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 
 	public MXSlider(Context context) {
 		super(context);
-		init();
+		init(null);
 	}
 
 	public MXSlider(Context context, AttributeSet attrs) {
 		super(context, attrs);
-		init();
+		init(attrs);
 	}
 
 	public MXSlider(Context context, AttributeSet attrs, int defStyleAttr) {
 		super(context, attrs, defStyleAttr);
-		init();
+		init(attrs);
 	}
 
 	public MXSlider(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
 		super(context, attrs, defStyleAttr, defStyleRes);
-		init();
+		init(attrs);
 	}
 
 	/**
@@ -116,7 +159,10 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 		return Uri.parse(SCHEME_ASSETS + ":///" + path);
 	}
 
-	private void init() {
+	private void init(AttributeSet attrs) {
+		TypedArray a = getContext().obtainStyledAttributes(attrs, R.styleable.MXSlider);
+		textPositionStyle = TextPositionStyle.fromId(a.getInt(R.styleable.MXSlider_mx_textPositionStyle, textPositionStyle.getId()));
+
 		titleFontSize = Util.getPxFromDp(getContext(), titleFontSize);
 		subtitleFontSize = Util.getPxFromDp(getContext(), subtitleFontSize);
 		sideTopMargin = Util.getPxFromDp(getContext(), sideTopMargin);
@@ -129,6 +175,7 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 			paint.setStyle(Paint.Style.STROKE);
 		}
 		setPageManager(new PageManager(getContext(), this));
+		a.recycle();
 	}
 
 	private void initPaint() {
@@ -285,6 +332,7 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 
 	public void setSideTopMargin(int sideTopMargin) {
 		this.sideTopMargin = sideTopMargin;
+		invalidate();
 	}
 
 	public int getSideHeight() {
@@ -293,6 +341,7 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 
 	public void setSideHeight(int sideHeight) {
 		this.sideHeight = sideHeight;
+		invalidate();
 	}
 
 	public int getSideWidth() {
@@ -301,6 +350,7 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 
 	public void setSideWidth(int sideWidth) {
 		this.sideWidth = sideWidth;
+		invalidate();
 	}
 
 	public float getTitleFontSize() {
@@ -309,6 +359,7 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 
 	public void setTitleFontSize(float titleFontSize) {
 		this.titleFontSize = titleFontSize;
+		invalidate();
 	}
 
 	public float getSubtitleFontSize() {
@@ -317,6 +368,7 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 
 	public void setSubtitleFontSize(float subtitleFontSize) {
 		this.subtitleFontSize = subtitleFontSize;
+		invalidate();
 	}
 
 	public boolean isLoop() {
@@ -336,6 +388,14 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 		return swipePosition;
 	}
 
+	public TextPositionStyle getTextPositionStyle() {
+		return textPositionStyle;
+	}
+
+	public void setTextPositionStyle(TextPositionStyle textPositionStyle) {
+		this.textPositionStyle = textPositionStyle;
+		invalidate();
+	}
 	/**
 	 * whether settling is triggered by user's fling
 	 */
@@ -414,16 +474,39 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 				paint.setShadowLayer(2, 2, 2, Color.parseColor("#7F000000"));
 				paint.setTextSize(titleFontSize);
 				paint.setColor(Color.WHITE);
+				paint.setTypeface(Typeface.create(Typeface.MONOSPACE, Typeface.BOLD));
 				paint.setStyle(Paint.Style.FILL);
 				paint.setTextAlign(Paint.Align.CENTER);
-				StaticLayout staticLayout = new StaticLayout(pageManager.getPage(index).getTitle(), new TextPaint(paint), width, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
-				canvas.save();
-				canvas.translate(width / 2.0f + offset * 0.1f * width, (height - staticLayout.getHeight()) * 0.34f);
-				staticLayout.draw(canvas);
+				StaticLayout titleStaticLayout;
+				StaticLayout subtitleStaticLayout;
+				int titleHeight;
+				int subtitleHeight;
+				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+					titleStaticLayout = StaticLayout.Builder.obtain(pageManager.getPage(index).getTitle(), 0, pageManager.getPage(index).getTitle().length(), new TextPaint(paint), width).build();
+				} else {
+					titleStaticLayout = new StaticLayout(pageManager.getPage(index).getTitle(), new TextPaint(paint), width, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
+				}
+				titleHeight = titleStaticLayout.getHeight();
 				paint.setTextSize(subtitleFontSize);
-				canvas.translate(0, staticLayout.getHeight() + 40);
-				staticLayout = new StaticLayout(pageManager.getPage(index).getSubtitle(), new TextPaint(paint), width, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
-				staticLayout.draw(canvas);
+				paint.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD));
+				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+					subtitleStaticLayout = StaticLayout.Builder.obtain(pageManager.getPage(index).getSubtitle(), 0, pageManager.getPage(index).getSubtitle().length(), new TextPaint(paint), width).build();
+				} else {
+					subtitleStaticLayout = new StaticLayout(pageManager.getPage(index).getSubtitle(), new TextPaint(paint), width, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
+				}
+				subtitleHeight = subtitleStaticLayout.getHeight();
+				canvas.save();
+				switch (textPositionStyle) {
+					case CLASSICAL:
+						canvas.translate(width / 2.0f + offset * 0.1f * width, height * textVerticalPosition - titleHeight);
+						break;
+					case PACKED:
+						canvas.translate(width / 2.0f + offset * 0.1f * width, (height - titleHeight - subtitleHeight) * textVerticalPosition);
+						break;
+				}
+				titleStaticLayout.draw(canvas);
+				canvas.translate(0, titleHeight + textVerticalSpacing);
+				subtitleStaticLayout.draw(canvas);
 				canvas.restore();
 				paint.setShadowLayer(0, 0, 0, 0);
 				canvas.restore();
@@ -439,13 +522,13 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 		paint.setShader(null);
 	}
 
-	private static int argb(
-			@IntRange(from = 0, to = 255) int alpha,
-			@IntRange(from = 0, to = 255) int red,
-			@IntRange(from = 0, to = 255) int green,
-			@IntRange(from = 0, to = 255) int blue) {
-		return (alpha << 24) | (red << 16) | (green << 8) | blue;
-	}
+//	private static int argb(
+//			@IntRange(from = 0, to = 255) int alpha,
+//			@IntRange(from = 0, to = 255) int red,
+//			@IntRange(from = 0, to = 255) int green,
+//			@IntRange(from = 0, to = 255) int blue) {
+//		return (alpha << 24) | (red << 16) | (green << 8) | blue;
+//	}
 
 	private void drawPageImages(Canvas canvas, int width, int height) {
 		float offset;

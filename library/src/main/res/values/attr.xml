@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<declare-styleable name = "MXSlider">
+		<attr name = "mx_textPositionStyle" format = "enum">
+			<enum name = "classical" value = "0"/>
+			<enum name = "packed" value = "1"/>
+		</attr>
+		<attr name = "mx_titleFontSize" format = "dimension"/>
+		<attr name = "mx_subtitleFontSize" format = "dimension"/>
+		<attr name = "mx_textVerticalPosition" format = "float"/>
+		<attr name = "mx_sideTopMargin" format = "dimension"/>
+		<attr name = "mx_sideWidth" format = "dimension"/>
+		<attr name = "mx_sideHeight" format = "dimension"/>
+	</declare-styleable>
+</resources>

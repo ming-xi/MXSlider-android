@@ -37,7 +37,7 @@ public class MainActivity extends AppCompatActivity {
 			"Return\nof\nthe Ancients",
 			"熏しの隠れ家",
 			"銀の意志\nSuper Arrange Ver",
-			"Weight\nof\nthe World\nthe End\nof\nYoRHa",
+			"Weight of the World the End of YoRHa",
 	};
 	private static final String[] testAuthors = new String[]{"" +
 			"菅野よう子",
@@ -110,7 +110,9 @@ public class MainActivity extends AppCompatActivity {
 		b_random.setOnClickListener(new View.OnClickListener() {
 			@Override
 			public void onClick(View v) {
-				mediaPlayer.seekTo(mediaPlayer.getDuration() - 3000);
+//				//seek to the end of current playing music in order to test auto playing next music.
+//				mediaPlayer.seekTo(mediaPlayer.getDuration() - 3000);
+				slider.setTextPositionStyle(slider.getTextPositionStyle() == MXSlider.TextPositionStyle.CLASSICAL ? MXSlider.TextPositionStyle.PACKED : MXSlider.TextPositionStyle.CLASSICAL);
 			}
 		});
 		b_loop.setOnClickListener(new View.OnClickListener() {
@@ -234,10 +236,15 @@ public class MainActivity extends AppCompatActivity {
 			pages.add(new MusicItem(testTitles[i % testTitles.length], testAuthors[i % testAuthors.length], Uri.parse("assets:///test/" + i + ".jpg"), Uri.parse("assets:///test/" + i + ".mp3")));
 		}
 //      uncomment following line if you want to test all types of uris(file://, content:// and android.resource://)
-		testAllTypeOfUris(pages);
+//		testAllTypeOfUris(pages);
 		return pages;
 	}
 
+	/**
+	 * This method will change test pages in order to test all supported uri schemes
+	 *
+	 * @param pages generated pages
+	 */
 	@SuppressLint("CheckResult")
 	private void testAllTypeOfUris(List<MusicItem> pages) {
 		pages.get(0).coverUri = Uri.parse("android.resource://tech.mingxi.musicplayerdemo/drawable/ic_launcher");
