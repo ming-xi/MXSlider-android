@@ -13,12 +13,12 @@ import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.SystemClock;
-import android.support.annotation.IntRange;
 import android.support.v4.view.ViewPager;
 import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
 import android.view.View;
@@ -29,8 +29,9 @@ import java.util.List;
 import tech.mingxi.library.R;
 
 public class MXSlider extends View implements PageManager.OnStateChangeListener {
+
 	public enum TextPositionStyle {
-		CLASSICAL(0), PACKED(1);
+		CLASSIC(0), PACKED(1);
 
 		private final int id;
 
@@ -40,7 +41,7 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 					return PACKED;
 				case 0:
 				default:
-					return CLASSICAL;
+					return CLASSIC;
 			}
 		}
 
@@ -53,7 +54,39 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 		}
 	}
 
+	public enum SideImageMeasuringStyle {
+		PERCENTAGE(0), PIXEL(1);
+
+		private final int id;
+
+		static SideImageMeasuringStyle fromId(int id) {
+			switch (id) {
+				case 1:
+					return PIXEL;
+				case 0:
+				default:
+					return PERCENTAGE;
+			}
+		}
+
+		SideImageMeasuringStyle(int i) {
+			id = i;
+		}
+
+		public int getId() {
+			return id;
+		}
+	}
+
 	public static final String DEBUG_TAG = "MXSlider";
+
+	private static final int DEFAULT_TITLE_FONT_SIZE = 32;
+	private static final int DEFAULT_SUBTITLE_FONT_SIZE = 12;
+
+	private static final float DEFAULT_SIDE_TOP_MARGIN = 108f;
+	private static final float DEFAULT_SIDE_HEIGHT = 350f;
+	private static final float DEFAULT_SIDE_WIDTH = 24f;
+
 	private static boolean DEBUG = false;
 	private List<Rect> debugRects;
 	/**
@@ -69,7 +102,8 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 	 */
 	static final String SCHEME_ASSETS = "assets";
 
-	TextPositionStyle textPositionStyle = TextPositionStyle.CLASSICAL;
+	private TextPositionStyle textPositionStyle;
+	private SideImageMeasuringStyle sideImageMeasuringStyle;
 	/**
 	 * vertical position of the anchor of text
 	 */
@@ -79,17 +113,29 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 	 */
 	private float textVerticalSpacing = 40f;
 	/**
+	 * side-image's top margin's percentage in this view's Height
+	 */
+	private float sideTopMarginPercentage = 0.133f;
+	/**
+	 * side-image's height's percentage in this view's Height
+	 */
+	private float sideHeightPercentage = 0.431f;
+	/**
+	 * side-image's width's percentage in this view's Width
+	 */
+	private float sideWidthPercentage = 0.064f;
+	/**
 	 * side-image's top margin
 	 */
-	private int sideTopMargin = 108;
+	private float sideTopMargin;
 	/**
 	 * side-image's height
 	 */
-	private int sideHeight = 350;
+	private float sideHeight;
 	/**
 	 * side-image's width
 	 */
-	private int sideWidth = 24;
+	private float sideWidth;
 	/**
 	 * text's margin
 	 */
@@ -97,11 +143,11 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 	/**
 	 * title's font-size
 	 */
-	private float titleFontSize = 32;
+	private float titleFontSize;
 	/**
 	 * subtitle's font-size
 	 */
-	private float subtitleFontSize = 12;
+	private float subtitleFontSize;
 	/**
 	 * swipe position in [0,size-1]. e.g. 1.5f means user swiped to the position where second image
 	 * and third image are both displayed half of themselves.
@@ -112,11 +158,20 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 	 */
 	private boolean loop = true;
 	/**
+	 * if true, refreshBitmaps() will be triggered when onLayout() is called.
+	 * it is recommended to turn this off if this view's size changes from time to time.
+	 */
+	private boolean refreshBitmapsOnLayout = true;
+	/**
 	 * when setIndex(id, true) is called, this flag will be set to true to prevent user's touch events
 	 * and will be set to false when settling animation is done and user touches screen again.
 	 */
 	private boolean userTouchCanceled = false;
 	private Paint paint;
+
+	private int[] shadowGradientColors;
+
+	private float[] shadowGradientPositions;
 	/**
 	 * shadow on images
 	 */
@@ -160,14 +215,8 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 	}
 
 	private void init(AttributeSet attrs) {
-		TypedArray a = getContext().obtainStyledAttributes(attrs, R.styleable.MXSlider);
-		textPositionStyle = TextPositionStyle.fromId(a.getInt(R.styleable.MXSlider_mx_textPositionStyle, textPositionStyle.getId()));
+		setPropertiesFromAttribute(attrs);
 
-		titleFontSize = Util.getPxFromDp(getContext(), titleFontSize);
-		subtitleFontSize = Util.getPxFromDp(getContext(), subtitleFontSize);
-		sideTopMargin = Util.getPxFromDp(getContext(), sideTopMargin);
-		sideHeight = Util.getPxFromDp(getContext(), sideHeight);
-		sideWidth = Util.getPxFromDp(getContext(), sideWidth);
 		setWillNotDraw(false);
 		initPaint();
 		if (DEBUG) {
@@ -175,6 +224,83 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 			paint.setStyle(Paint.Style.STROKE);
 		}
 		setPageManager(new PageManager(getContext(), this));
+	}
+
+	private void setPropertiesFromAttribute(AttributeSet attrs) {
+		TypedArray a = getContext().obtainStyledAttributes(attrs, R.styleable.MXSlider);
+		if (a.hasValue(R.styleable.MXSlider_mx_textPositionStyle)) {
+			textPositionStyle = TextPositionStyle.fromId(a.getInt(R.styleable.MXSlider_mx_textPositionStyle, 0));
+		} else {
+			textPositionStyle = TextPositionStyle.CLASSIC;
+		}
+		if (a.hasValue(R.styleable.MXSlider_mx_sideImageMeasuringStyle)) {
+			sideImageMeasuringStyle = SideImageMeasuringStyle.fromId(a.getInt(R.styleable.MXSlider_mx_sideImageMeasuringStyle, 0));
+		} else {
+			sideImageMeasuringStyle = SideImageMeasuringStyle.PERCENTAGE;
+		}
+		if (a.hasValue(R.styleable.MXSlider_mx_sideTopMargin)) {
+			sideTopMargin = a.getDimension(R.styleable.MXSlider_mx_sideTopMargin, 0);
+		} else {
+			sideTopMargin = Util.getPxFromDp(getContext(), DEFAULT_SIDE_TOP_MARGIN);
+		}
+		if (a.hasValue(R.styleable.MXSlider_mx_sideWidth)) {
+			sideWidth = a.getDimension(R.styleable.MXSlider_mx_sideWidth, 0);
+		} else {
+			sideWidth = Util.getPxFromDp(getContext(), DEFAULT_SIDE_WIDTH);
+		}
+		if (a.hasValue(R.styleable.MXSlider_mx_sideHeight)) {
+			sideHeight = a.getDimension(R.styleable.MXSlider_mx_sideHeight, 0);
+		} else {
+			sideHeight = Util.getPxFromDp(getContext(), DEFAULT_SIDE_HEIGHT);
+		}
+		if (a.hasValue(R.styleable.MXSlider_mx_sideTopMarginPercentage)) {
+			sideTopMarginPercentage = a.getFloat(R.styleable.MXSlider_mx_sideTopMarginPercentage, sideTopMarginPercentage);
+		}
+		if (a.hasValue(R.styleable.MXSlider_mx_sideWidthPercentage)) {
+			sideWidthPercentage = a.getFloat(R.styleable.MXSlider_mx_sideWidthPercentage, sideWidthPercentage);
+		}
+		if (a.hasValue(R.styleable.MXSlider_mx_sideHeightPercentage)) {
+			sideHeightPercentage = a.getFloat(R.styleable.MXSlider_mx_sideHeightPercentage, sideHeightPercentage);
+		}
+		if (a.hasValue(R.styleable.MXSlider_mx_titleFontSize)) {
+			titleFontSize = a.getDimension(R.styleable.MXSlider_mx_titleFontSize, 0);
+		} else {
+			titleFontSize = Util.getPxFromDp(getContext(), DEFAULT_TITLE_FONT_SIZE);
+		}
+		if (a.hasValue(R.styleable.MXSlider_mx_subtitleFontSize)) {
+			subtitleFontSize = a.getDimension(R.styleable.MXSlider_mx_subtitleFontSize, 0);
+		} else {
+			subtitleFontSize = Util.getPxFromDp(getContext(), DEFAULT_SUBTITLE_FONT_SIZE);
+		}
+		refreshBitmapsOnLayout = a.getBoolean(R.styleable.MXSlider_mx_refreshBitmapsOnLayout, refreshBitmapsOnLayout);
+		TypedArray shadowGradientColors;
+		TypedArray shadowGradientPositions;
+		if (a.hasValue(R.styleable.MXSlider_mx_shadowGradientColors) && a.hasValue(R.styleable.MXSlider_mx_shadowGradientPositions)) {
+			int resourceId = a.getResourceId(R.styleable.MXSlider_mx_shadowGradientColors, 0);
+			shadowGradientColors = getResources().obtainTypedArray(resourceId);
+			resourceId = a.getResourceId(R.styleable.MXSlider_mx_shadowGradientPositions, 0);
+			shadowGradientPositions = getResources().obtainTypedArray(resourceId);
+		} else {
+			if (a.hasValue(R.styleable.MXSlider_mx_shadowGradientColors) | a.hasValue(R.styleable.MXSlider_mx_shadowGradientPositions)) {
+				Log.w(DEBUG_TAG, "only one of shadowGradientColors or shadowGradientPositions is set! so it will be ignored and default values will be used to prevent unexpected problems");
+			}
+			shadowGradientColors = getResources().obtainTypedArray(R.array.mx_slider_default_gradient_colors);
+			shadowGradientPositions = getResources().obtainTypedArray(R.array.mx_slider_default_gradient_positions);
+		}
+		int length = Math.min(shadowGradientColors.length(), shadowGradientPositions.length());
+		if (shadowGradientColors.length() != shadowGradientPositions.length()) {
+			Log.w(DEBUG_TAG, "shadowGradientColors array's length not equals to shadowGradientPositions array's length!");
+		}
+		this.shadowGradientColors = new int[length];
+		for (int i = 0; i < length; i++) {
+			this.shadowGradientColors[i] = shadowGradientColors.getColor(i, Color.TRANSPARENT);
+		}
+		shadowGradientColors.recycle();
+		this.shadowGradientPositions = new float[length];
+		for (int i = 0; i < length; i++) {
+			this.shadowGradientPositions[i] = shadowGradientPositions.getFloat(i, 0);
+		}
+		shadowGradientPositions.recycle();
 		a.recycle();
 	}
 
@@ -326,29 +452,59 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 		}
 	}
 
-	public int getSideTopMargin() {
+	public float getSideTopMarginPercentage() {
+		return sideTopMarginPercentage;
+	}
+
+	public void setSideTopMarginPercentage(float sideTopMarginPercentage) {
+		this.sideTopMarginPercentage = sideTopMarginPercentage;
+		refreshSideImageSize();
+		invalidate();
+	}
+
+	public float getSideHeightPercentage() {
+		return sideHeightPercentage;
+	}
+
+	public void setSideHeightPercentage(float sideHeightPercentage) {
+		this.sideHeightPercentage = sideHeightPercentage;
+		refreshSideImageSize();
+		invalidate();
+	}
+
+	public float getSideWidthPercentage() {
+		return sideWidthPercentage;
+	}
+
+	public void setSideWidthPercentage(float sideWidthPercentage) {
+		this.sideWidthPercentage = sideWidthPercentage;
+		refreshSideImageSize();
+		invalidate();
+	}
+
+	public float getSideTopMargin() {
 		return sideTopMargin;
 	}
 
-	public void setSideTopMargin(int sideTopMargin) {
+	public void setSideTopMargin(float sideTopMargin) {
 		this.sideTopMargin = sideTopMargin;
 		invalidate();
 	}
 
-	public int getSideHeight() {
+	public float getSideHeight() {
 		return sideHeight;
 	}
 
-	public void setSideHeight(int sideHeight) {
+	public void setSideHeight(float sideHeight) {
 		this.sideHeight = sideHeight;
 		invalidate();
 	}
 
-	public int getSideWidth() {
+	public float getSideWidth() {
 		return sideWidth;
 	}
 
-	public void setSideWidth(int sideWidth) {
+	public void setSideWidth(float sideWidth) {
 		this.sideWidth = sideWidth;
 		invalidate();
 	}
@@ -380,6 +536,14 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 		invalidate();
 	}
 
+	public boolean isRefreshBitmapsOnLayout() {
+		return refreshBitmapsOnLayout;
+	}
+
+	public void setRefreshBitmapsOnLayout(boolean refreshBitmapsOnLayout) {
+		this.refreshBitmapsOnLayout = refreshBitmapsOnLayout;
+	}
+
 	public void setOnSwipeListener(OnSwipeListener onSwipeListener) {
 		this.onSwipeListener = onSwipeListener;
 	}
@@ -396,6 +560,25 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 		this.textPositionStyle = textPositionStyle;
 		invalidate();
 	}
+
+	public SideImageMeasuringStyle getSideImageMeasuringStyle() {
+		return sideImageMeasuringStyle;
+	}
+
+	public void setSideImageMeasuringStyle(SideImageMeasuringStyle sideImageMeasuringStyle) {
+		this.sideImageMeasuringStyle = sideImageMeasuringStyle;
+	}
+
+	private void refreshSideImageSize() {
+		if (sideImageMeasuringStyle == SideImageMeasuringStyle.PERCENTAGE) {
+			int width = getWidth();
+			int height = getHeight();
+			sideTopMargin = height * sideTopMarginPercentage;
+			sideHeight = height * sideHeightPercentage;
+			sideWidth = width * sideWidthPercentage;
+		}
+	}
+
 	/**
 	 * whether settling is triggered by user's fling
 	 */
@@ -440,7 +623,7 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 		int width = getWidth();
 		int height = getHeight();
 		drawPageImages(canvas, width, height);
-		drawShadow(canvas, width, height);
+		drawShadow(canvas);
 		drawPageText(canvas, width, height);
 		if (scrollState == ViewPager.SCROLL_STATE_SETTLING) {
 			handleSettlingState();
@@ -497,7 +680,7 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 				subtitleHeight = subtitleStaticLayout.getHeight();
 				canvas.save();
 				switch (textPositionStyle) {
-					case CLASSICAL:
+					case CLASSIC:
 						canvas.translate(width / 2.0f + offset * 0.1f * width, height * textVerticalPosition - titleHeight);
 						break;
 					case PACKED:
@@ -514,26 +697,22 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 		}
 	}
 
-	private void drawShadow(Canvas canvas, int width, int height) {
-		paint.setShader(shadowGradient);
-		paint.setStyle(Paint.Style.FILL);
-		canvas.drawRect(rectView, paint);
+	private void drawShadow(Canvas canvas) {
+		if (shadowGradient != null) {
+			paint.setShader(shadowGradient);
+			paint.setStyle(Paint.Style.FILL);
+			canvas.drawRect(rectView, paint);
+		}
 		paint.setStyle(Paint.Style.STROKE);
 		paint.setShader(null);
 	}
 
-//	private static int argb(
-//			@IntRange(from = 0, to = 255) int alpha,
-//			@IntRange(from = 0, to = 255) int red,
-//			@IntRange(from = 0, to = 255) int green,
-//			@IntRange(from = 0, to = 255) int blue) {
-//		return (alpha << 24) | (red << 16) | (green << 8) | blue;
-//	}
-
 	private void drawPageImages(Canvas canvas, int width, int height) {
 		float offset;
-		int centerWidth = width - 2 * sideWidth;
+		int centerWidth = (int) (width - 2 * sideWidth);
 		int bitmapCenterWidth;
+		double ratio = ((double) width) / height;
+		float x = 0;//new width or height for bitmap to fit this view's size
 		//draw background images
 		//try to draw 5 images around swipePosition
 		for (int index = (int) swipePosition - 2; index < swipePosition + 2; index++) {
@@ -555,12 +734,25 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 					canvas.drawRect(rectDst, paint);
 					paint.setStyle(Paint.Style.STROKE);
 				} else {
-					rectSrc.set(
-							0,
-							0,
-							bitmap.getWidth(),
-							bitmap.getHeight()
-					);
+					if (((double) bitmap.getWidth()) / bitmap.getHeight() <= ratio) {
+						//crop top and bottom
+						x = (float) (bitmap.getWidth() / ratio);
+						rectSrc.set(
+								0,
+								(int) ((bitmap.getHeight() - x) / 2.0),
+								bitmap.getWidth(),
+								(int) ((bitmap.getHeight() + x) / 2.0)
+						);
+					} else {
+						//crop left and right
+						x = (float) (bitmap.getHeight() * ratio);
+						rectSrc.set(
+								(int) ((bitmap.getWidth() - x) / 2.0),
+								0,
+								(int) ((bitmap.getWidth() + x) / 2.0),
+								bitmap.getHeight()
+						);
+					}
 					canvas.drawBitmap(bitmap, rectSrc, rectDst, paint);
 				}
 				if (DEBUG) {
@@ -581,9 +773,9 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 			offset = index - swipePosition;
 			rectDst.set(
 					(int) (sideWidth + offset * centerWidth),
-					sideTopMargin,
+					((int) sideTopMargin),
 					(int) (sideWidth + offset * centerWidth + centerWidth),
-					sideTopMargin + sideHeight
+					((int) (sideTopMargin + sideHeight))
 			);
 			if (DEBUG) {
 				debugRects.add(new Rect(rectDst));
@@ -596,13 +788,27 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 					canvas.drawRect(rectDst, paint);
 					paint.setStyle(Paint.Style.STROKE);
 				} else {
-					bitmapCenterWidth = (int) (((double) bitmap.getWidth()) / width * centerWidth);
-					rectSrc.set(
-							(int) (bitmap.getWidth() * (-0.5 * offset + 0.5) + bitmapCenterWidth * (0.5 * offset - 0.5)),
-							(int) (bitmap.getHeight() * ((double) sideTopMargin) / height),
-							(int) (bitmap.getWidth() * (-0.5 * offset + 0.5) + bitmapCenterWidth * (0.5 * offset + 0.5)),
-							(int) (bitmap.getHeight() * (((double) sideTopMargin + sideHeight) / height))
-					);
+					if (((double) bitmap.getWidth()) / bitmap.getHeight() <= ratio) {
+						//crop top and bottom
+						x = (float) (bitmap.getWidth() / ratio);
+						bitmapCenterWidth = (int) ((double) bitmap.getWidth() / width * centerWidth);
+						rectSrc.set(
+								(int) (bitmap.getWidth() * (-0.5 * offset + 0.5) + bitmapCenterWidth * (0.5 * offset - 0.5)),
+								(int) ((bitmap.getHeight() - x) / 2.0 + x * sideTopMargin / height),
+								(int) (bitmap.getWidth() * (-0.5 * offset + 0.5) + bitmapCenterWidth * (0.5 * offset + 0.5)),
+								(int) ((bitmap.getHeight() - x) / 2.0 + x * (((double) sideTopMargin + sideHeight) / height))
+						);
+					} else {
+						//crop left and right
+						x = (float) (bitmap.getHeight() * ratio);
+						bitmapCenterWidth = (int) (x / width * centerWidth);
+						rectSrc.set(
+								(int) ((bitmap.getWidth() - x) / 2.0 + x * (-0.5 * offset + 0.5) + bitmapCenterWidth * (0.5 * offset - 0.5)),
+								(int) (bitmap.getHeight() * ((double) sideTopMargin) / height),
+								(int) ((bitmap.getWidth() - x) / 2.0 + x * (-0.5 * offset + 0.5) + bitmapCenterWidth * (0.5 * offset + 0.5)),
+								(int) (bitmap.getHeight() * (((double) sideTopMargin + sideHeight) / height))
+						);
+					}
 					canvas.drawBitmap(bitmap, rectSrc, rectDst, paint);
 				}
 			}
@@ -615,15 +821,30 @@ public class MXSlider extends View implements PageManager.OnStateChangeListener 
 		super.onMeasure(widthMeasureSpec, heightMeasureSpec);
 	}
 
+	boolean firstLayout = true;
+
 	@Override
 	protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
 		super.onLayout(changed, left, top, right, bottom);
-		getGlobalVisibleRect(rectView);
-		shadowGradient = new LinearGradient(0, 0, 0, rectView.height(),
-				new int[]{0x1F000000, 0x3F000000, 0xAF000000, 0xFF000000},
-				new float[]{0, 0.5f, 0.75f, 1}
-				, android.graphics.Shader.TileMode.CLAMP);
-		pageManager.refreshBitmaps(getWidth(), getHeight());
+		if (firstLayout || refreshBitmapsOnLayout) {
+			refreshBitmaps(getWidth(), getHeight());
+			firstLayout = false;
+		}
+	}
+
+	@Override
+	protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+		super.onSizeChanged(w, h, oldw, oldh);
+		getLocalVisibleRect(rectView);
+		Log.i(DEBUG_TAG, String.format("onSizeChanged w=%d h=%d oldw=%d oldh=%d rect=%s", w, h, oldw, oldh, rectView.toString()));
+		if (shadowGradientColors != null && shadowGradientPositions != null) {
+			shadowGradient = new LinearGradient(0, 0, 0, rectView.height(), shadowGradientColors, shadowGradientPositions, android.graphics.Shader.TileMode.CLAMP);
+		}
+		refreshSideImageSize();
+	}
+
+	public void refreshBitmaps(int width, int height) {
+		pageManager.refreshBitmaps(width, height);
 	}
 
 	private void handleSettlingState() {

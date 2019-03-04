@@ -5,11 +5,21 @@
 			<enum name = "classical" value = "0"/>
 			<enum name = "packed" value = "1"/>
 		</attr>
+		<attr name = "mx_sideImageMeasuringStyle" format = "enum">
+			<enum name = "percentage" value = "0"/>
+			<enum name = "pixel" value = "1"/>
+		</attr>
 		<attr name = "mx_titleFontSize" format = "dimension"/>
 		<attr name = "mx_subtitleFontSize" format = "dimension"/>
 		<attr name = "mx_textVerticalPosition" format = "float"/>
 		<attr name = "mx_sideTopMargin" format = "dimension"/>
 		<attr name = "mx_sideWidth" format = "dimension"/>
 		<attr name = "mx_sideHeight" format = "dimension"/>
+		<attr name = "mx_sideTopMarginPercentage" format = "float"/>
+		<attr name = "mx_sideWidthPercentage" format = "float"/>
+		<attr name = "mx_sideHeightPercentage" format = "float"/>
+		<attr name = "mx_shadowGradientColors" format = "reference"/>
+		<attr name = "mx_shadowGradientPositions" format = "reference"/>
+		<attr name = "mx_refreshBitmapsOnLayout" format = "boolean"/>
 	</declare-styleable>
 </resources>

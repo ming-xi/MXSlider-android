@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+	<array name = "slider_gradient_colors">
+		<item>0x1FFF0000</item>
+		<item>0x3FFF0000</item>
+		<item>0xAFFF0000</item>
+		<item>0xFFFF0000</item>
+	</array>
+	<array name = "slider_gradient_positions">
+		<item>0</item>
+		<item>0.33</item>
+		<item>0.66</item>
+		<item>1</item>
+	</array>
+</resources>

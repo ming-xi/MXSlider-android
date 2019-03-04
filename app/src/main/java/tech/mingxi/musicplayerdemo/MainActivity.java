@@ -9,7 +9,10 @@ import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.support.constraint.ConstraintLayout;
+import android.support.constraint.ConstraintSet;
 import android.support.v7.app.AppCompatActivity;
+import android.transition.TransitionManager;
 import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
@@ -46,11 +49,13 @@ public class MainActivity extends AppCompatActivity {
 			"Falcom Sound Team jdk",
 			"YoRHa",
 	};
+	private ConstraintLayout cl;
 	private ImageButton b_play;
 	private ImageButton b_prev;
 	private ImageButton b_next;
 	private ImageButton b_random;
 	private ImageButton b_loop;
+	private ImageButton b_debug;
 	private ProgressBar pb_progress;
 	private MediaPlayer mediaPlayer;
 	private MXSlider slider;
@@ -64,14 +69,58 @@ public class MainActivity extends AppCompatActivity {
 		super.onCreate(savedInstanceState);
 		getWindow().addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
 		setContentView(R.layout.activity_main);
+		progressBarMax = getResources().getInteger(R.integer.progress_max);
+		initViews();
+		initMediaPlayer();
+	}
+
+	private void initMediaPlayer() {
+		mediaPlayer = new MediaPlayer();
+		mediaPlayer.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+			@Override
+			public void onPrepared(MediaPlayer mp) {
+				inited = true;
+				startPlayer();
+			}
+		});
+		mediaPlayer.setOnErrorListener(new MediaPlayer.OnErrorListener() {
+			@Override
+			public boolean onError(MediaPlayer mp, int what, int extra) {
+				Log.i(DEBUG_TAG, String.format("onError what = %d extra = %d", what, extra));
+				return true;
+			}
+		});
+		mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+			@Override
+			public void onCompletion(MediaPlayer mp) {
+				if (slider.getIndex() >= slider.getPageManager().getPageCount()) {
+					return;
+				}
+				slider.setIndex(slider.getIndex() + 1, true);
+			}
+		});
+		setDataSourceIndex(0);
+		timer = new Timer();
+		timer.schedule(new TimerTask() {
+			@Override
+			public void run() {
+				if (mediaPlayer.isPlaying()) {
+					pb_progress.setProgress((int) (((float) mediaPlayer.getCurrentPosition()) * progressBarMax / mediaPlayer.getDuration()));
+				}
+			}
+		}, 0, 250);
+	}
+
+	private void initViews() {
+		cl = findViewById(R.id.activity_main_cl);
 		slider = findViewById(R.id.activity_main_slider);
 		b_play = findViewById(R.id.activity_main_play);
 		b_prev = findViewById(R.id.activity_main_prev);
 		b_next = findViewById(R.id.activity_main_next);
 		b_random = findViewById(R.id.activity_main_random);
 		b_loop = findViewById(R.id.activity_main_loop);
+		b_debug = findViewById(R.id.activity_main_debug);
 		pb_progress = findViewById(R.id.activity_main_progress);
-		progressBarMax = getResources().getInteger(R.integer.progress_max);
 		slider.getPageManager().addAllPages(generatePages());
 		slider.setOnSwipeListener(new MXSlider.OnSwipeListener() {
 			@Override
@@ -110,9 +159,9 @@ public class MainActivity extends AppCompatActivity {
 		b_random.setOnClickListener(new View.OnClickListener() {
 			@Override
 			public void onClick(View v) {
-//				//seek to the end of current playing music in order to test auto playing next music.
-//				mediaPlayer.seekTo(mediaPlayer.getDuration() - 3000);
-				slider.setTextPositionStyle(slider.getTextPositionStyle() == MXSlider.TextPositionStyle.CLASSICAL ? MXSlider.TextPositionStyle.PACKED : MXSlider.TextPositionStyle.CLASSICAL);
+				//change text position style
+				slider.setTextPositionStyle(slider.getTextPositionStyle() == MXSlider.TextPositionStyle.CLASSIC ? MXSlider.TextPositionStyle.PACKED : MXSlider.TextPositionStyle.CLASSIC);
+				Toast.makeText(getBaseContext(), "testing changing text alignment style!", Toast.LENGTH_LONG).show();
 			}
 		});
 		b_loop.setOnClickListener(new View.OnClickListener() {
@@ -121,40 +170,26 @@ public class MainActivity extends AppCompatActivity {
 				slider.setLoop(!slider.isLoop());
 			}
 		});
-		mediaPlayer = new MediaPlayer();
-		mediaPlayer.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+		b_debug.setOnClickListener(new View.OnClickListener() {
+			boolean resized = false;
+
 			@Override
-			public void onPrepared(MediaPlayer mp) {
-				inited = true;
-				startPlayer();
-			}
-		});
-		mediaPlayer.setOnErrorListener(new MediaPlayer.OnErrorListener() {
-			@Override
-			public boolean onError(MediaPlayer mp, int what, int extra) {
-				Log.i(DEBUG_TAG, String.format("onError what = %d extra = %d", what, extra));
-				return true;
-			}
-		});
-		mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-			@Override
-			public void onCompletion(MediaPlayer mp) {
-				if (slider.getIndex() >= slider.getPageManager().getPageCount()) {
-					return;
+			public void onClick(View v) {
+				TransitionManager.beginDelayedTransition(cl);
+				ConstraintSet set = new ConstraintSet();
+				set.clone(cl);
+				if (resized) {
+					set.constrainWidth(slider.getId(), 0);
+					set.constrainHeight(slider.getId(), 0);
+				} else {
+					set.constrainWidth(slider.getId(), Util.getPxFromDp(getBaseContext(), 200));
+					set.constrainHeight(slider.getId(), Util.getPxFromDp(getBaseContext(), 200));
 				}
-				slider.setIndex(slider.getIndex() + 1, true);
+				Toast.makeText(getBaseContext(), "testing resizing view!", Toast.LENGTH_LONG).show();
+				resized = !resized;
+				set.applyTo(cl);
 			}
 		});
-		setDataSourceIndex(0);
-		timer = new Timer();
-		timer.schedule(new TimerTask() {
-			@Override
-			public void run() {
-				if (mediaPlayer.isPlaying()) {
-					pb_progress.setProgress((int) (((float) mediaPlayer.getCurrentPosition()) * progressBarMax / mediaPlayer.getDuration()));
-				}
-			}
-		}, 0, 250);
 	}
 
 	private void setDataSourceIndex(int index) {
@@ -172,7 +207,6 @@ public class MainActivity extends AppCompatActivity {
 						mediaPlayer.reset();
 						mediaPlayer.setDataSource(descriptor.getFileDescriptor(), descriptor.getStartOffset(), descriptor.getLength());
 						mediaPlayer.prepare();
-
 					} catch (IOException e) {
 						Log.e(DEBUG_TAG, "", e);
 					}
@@ -211,6 +245,7 @@ public class MainActivity extends AppCompatActivity {
 		if (!mediaPlayer.isPlaying()) {
 			playPosition = 0;
 			mediaPlayer.start();
+			b_play.setImageResource(R.drawable.ic_pause_white_24dp);
 		}
 	}
 

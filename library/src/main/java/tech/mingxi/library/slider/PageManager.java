@@ -14,6 +14,7 @@ import java.util.Collection;
 import java.util.List;
 
 public class PageManager {
+	private static final boolean CROP_IMAGES = false;
 	private final OnStateChangeListener onStateChangeListener;
 	private final Context context;
 	private List<Page> pages;
@@ -113,18 +114,13 @@ public class PageManager {
 		BitmapFactory.Options options = new BitmapFactory.Options();
 		options.inSampleSize = calculateInSampleSize(options2, width, height);
 		options.inJustDecodeBounds = false;
-		return cropAndScaleBitmap(BitmapFactory.decodeStream(stream, null, options), width, height);
+		Bitmap bitmap = BitmapFactory.decodeStream(stream, null, options);
+		if (CROP_IMAGES) {
+			return cropAndScaleBitmap(bitmap, width, height);
+		} else {
+			return bitmap;
+		}
 	}
-
-//	private Bitmap decodeResource(@DrawableRes int res_id, int width, int height) {
-//		BitmapFactory.Options options = new BitmapFactory.Options();
-//		options.inJustDecodeBounds = true;
-//		BitmapFactory.decodeResource(context.getResources(), res_id, options);
-//		BitmapFactory.Options options2 = new BitmapFactory.Options();
-//		options2.inSampleSize = calculateInSampleSize(options, width, height);
-//		options2.inJustDecodeBounds = false;
-//		return cropAndScaleBitmap(BitmapFactory.decodeResource(context.getResources(), res_id, options2), width, height);
-//	}
 
 	private Bitmap cropAndScaleBitmap(Bitmap bitmap, int width, int height) {
 		int w;
